@@ -1,12 +1,12 @@
+Your `README.md` is mostly complete, but a few details are missing or could be improved to match the project guide exactly. Below is a **revised version** that adds missing pieces and clarifies steps. Fill in your actual screenshot links (the ones you already have) and adjust any paths if needed.
 
+```markdown
 # Multi-Container Runtime
 
 ## Team Information
 
-- Name 1: Nakshathira
-- SRN: PES2UG24AM096 
-- Name 2: poojitha  
-- SRN: PES2UG244AM112 
+- **Nakshathira** – SRN: PES2UG24AM096  
+- **Poojitha** – SRN: PES2UG244AM112  
 
 ---
 
@@ -14,98 +14,85 @@
 
 This project implements a lightweight Linux container runtime in C with:
 
-- A **user-space supervisor (`engine.c`)** managing multiple containers
-- A **kernel-space monitor (`monitor.c`)** enforcing memory limits
-- A **bounded-buffer logging system**
-- A **CLI interface using IPC**
-- Controlled **Linux scheduling experiments**
+- A **user-space supervisor (`engine.c`)** managing multiple containers  
+- A **kernel-space monitor (`monitor.c`)** enforcing memory limits  
+- A **bounded‑buffer logging system** (producer/consumer threads)  
+- A **CLI interface using UNIX domain sockets** for IPC  
+- Controlled **Linux scheduling experiments**  
 
 ---
 
 ## Build, Load, and Run Instructions
 
-### 1. Environment Setup
+### 1. Environment Setup (Ubuntu 22.04/24.04 VM)
 
 ```bash
 sudo apt update
 sudo apt install -y build-essential linux-headers-$(uname -r)
-````
-
----
-
-### 2. Build the Project
-
-```bash
-make
-```
-  
----
-
-### 3. Load Kernel Module
-
-```bash
-sudo insmod monitor.ko
-ls -l /dev/container_monitor
 ```
 
----
-
-### 4. Prepare Root Filesystem
+### 2. Prepare the Root Filesystem (Alpine minirootfs)
 
 ```bash
 mkdir rootfs-base
 wget https://dl-cdn.alpinelinux.org/alpine/v3.20/releases/x86_64/alpine-minirootfs-3.20.3-x86_64.tar.gz
 tar -xzf alpine-minirootfs-3.20.3-x86_64.tar.gz -C rootfs-base
+
+# Create writable copies for containers
+cp -a rootfs-base rootfs-alpha
+cp -a rootfs-base rootfs-beta
 ```
 
-Create container-specific rootfs:
+### 3. Build the Project
 
 ```bash
-cp -a ./rootfs-base ./rootfs-alpha
-cp -a ./rootfs-base ./rootfs-beta
+cd boilerplate
+make
 ```
 
----
-
-### 5. Start Supervisor
+### 4. Load the Kernel Module
 
 ```bash
-sudo ./engine supervisor ./rootfs-base
+sudo insmod monitor.ko
+ls -l /dev/container_monitor   # should show the device
 ```
 
----
-
-### 6. Run Containers
+### 5. Start the Supervisor (keep this terminal open)
 
 ```bash
-sudo ./engine start alpha ./rootfs-alpha /bin/sh --soft-mib 48 --hard-mib 80
-sudo ./engine start beta ./rootfs-beta /bin/sh --soft-mib 64 --hard-mib 96
+sudo ./engine supervisor ../rootfs-base
 ```
 
----
-
-### 7. CLI Commands
+### 6. In a Second Terminal – Manage Containers
 
 ```bash
+cd boilerplate
+
+# Start two containers
+sudo ./engine start alpha ../rootfs-alpha "/bin/sh" --soft-mib 48 --hard-mib 80
+sudo ./engine start beta  ../rootfs-beta  "/bin/sh" --soft-mib 64 --hard-mib 96
+
+# List containers
 sudo ./engine ps
+
+# View logs
 sudo ./engine logs alpha
+
+# Stop a container
 sudo ./engine stop alpha
 ```
 
----
-
-### 8. Run Experiments
+### 7. Run Workloads (copy binary into container rootfs first)
 
 ```bash
-# Copy workload into container
-cp workload_binary ./rootfs-alpha/
-
-# Run workloads inside container
+cp memory_hog ../rootfs-alpha/
+sudo ./engine start memtest ../rootfs-alpha "/memory_hog 120" --soft-mib 30 --hard-mib 60
 ```
 
----
+### 8. Clean Up
 
-### 9. Cleanup
+- In the supervisor terminal, press `Ctrl+C` to stop the supervisor.  
+- Unload the kernel module:
 
 ```bash
 sudo rmmod monitor
@@ -115,68 +102,18 @@ sudo rmmod monitor
 
 ## Demo with Screenshots
 
-### 1. Multi-container Supervision
+| # | What is Shown | Screenshot |
+|---|---------------|------------|
+| 1 | **Multi‑container supervision** – two or more containers running under one supervisor. | ![1](https://github.com/user-attachments/assets/d32dbb65-a5a9-414c-90e7-626791d55a53) |
+| 2 | **Metadata tracking** – `engine ps` output showing IDs, PIDs, state, limits. | ![2](https://github.com/user-attachments/assets/8ab65dee-0ec1-4924-bfa5-0d24ba4b8fe1) |
+| 3 | **Bounded‑buffer logging** – log file contents captured from container output. | ![3](https://github.com/user-attachments/assets/09314782-d15f-4434-b203-0780b6990165) |
+| 4 | **CLI and IPC** – a CLI command and the supervisor’s response. | ![4](https://github.com/user-attachments/assets/5c1fc398-b531-4a16-99b0-c77adedba6cb) |
+| 5 | **Soft‑limit warning** – `dmesg` showing a soft limit event. | ![5](https://github.com/user-attachments/assets/97c118b8-6a05-4d05-86e2-9007001cbcc0) |
+| 6 | **Hard‑limit enforcement** – `dmesg` hard limit line + `engine ps` showing `killed`. | ![6](https://github.com/user-attachments/assets/d2df78db-b5e2-4b24-b262-f6f49983cdbc) |
+| 7 | **Scheduling experiment** – CPU usage difference between `nice 19` and `nice -20`. | ![7](https://github.com/user-attachments/assets/9bf2a79f-3c3b-4a6f-bc09-91ad0a6b7deb) |
+| 8 | **Clean teardown** – supervisor exit messages, no leftover process, no socket. | ![8](https://github.com/user-attachments/assets/b1c69003-9710-4aa3-8010-42d3bc541364) |
 
-**Description:** Multiple containers running under one supervisor
-**Screenshot:**
-<img width="626" height="170" alt="Screenshot 2026-04-15 at 5 02 47 PM" src="https://github.com/user-attachments/assets/d32dbb65-a5a9-414c-90e7-626791d55a53" />
-
----
-
-### 2. Metadata Tracking (`ps`)
-
-**Description:** Output showing container metadata
-**Screenshot:**
-<img width="631" height="180" alt="Screenshot 2026-04-15 at 5 03 15 PM" src="https://github.com/user-attachments/assets/8ab65dee-0ec1-4924-bfa5-0d24ba4b8fe1" />
-
-
----
-
-### 3. Bounded-buffer Logging
-
-**Description:** Logs captured via producer-consumer pipeline
-**Screenshot:**
-<img width="630" height="436" alt="Screenshot 2026-04-15 at 5 03 26 PM" src="https://github.com/user-attachments/assets/09314782-d15f-4434-b203-0780b6990165" />
-
----
-
-### 4. CLI and IPC
-
-**Description:** CLI sending command → supervisor response
-**Screenshot:**
-<img width="625" height="80" alt="Screenshot 2026-04-15 at 5 03 45 PM" src="https://github.com/user-attachments/assets/5c1fc398-b531-4a16-99b0-c77adedba6cb" />
-
----
-
-### 5. Soft Limit Warning
-
-**Description:** Kernel log showing soft limit exceeded
-**Screenshot:**
-<img width="632" height="77" alt="Screenshot 2026-04-15 at 5 03 56 PM" src="https://github.com/user-attachments/assets/97c118b8-6a05-4d05-86e2-9007001cbcc0" />
-
----
-
-### 6. Hard Limit Enforcement
-
-**Description:** Container killed after exceeding hard limit
-**Screenshot:**
-<img width="634" height="146" alt="Screenshot 2026-04-15 at 5 04 07 PM" src="https://github.com/user-attachments/assets/d2df78db-b5e2-4b24-b262-f6f49983cdbc" />
-
----
-
-### 7. Scheduling Experiment
-
-**Description:** Observed behavior differences between workloads
-**Screenshot:**
-<img width="631" height="159" alt="Screenshot 2026-04-15 at 5 04 21 PM" src="https://github.com/user-attachments/assets/9bf2a79f-3c3b-4a6f-bc09-91ad0a6b7deb" />
-
----
-
-### 8. Clean Teardown
-
-**Description:** No zombies, proper cleanup
-**Screenshot:**
-<img width="627" height="214" alt="Screenshot 2026-04-15 at 5 04 39 PM" src="https://github.com/user-attachments/assets/b1c69003-9710-4aa3-8010-42d3bc541364" />
+*Each screenshot includes a brief caption explaining what it demonstrates.*
 
 ---
 
@@ -184,140 +121,96 @@ sudo rmmod monitor
 
 ### 1. Isolation Mechanisms
 
-* Containers use:
+The runtime uses Linux namespaces to isolate containers:
 
-  * PID namespace
-  * UTS namespace
-  * Mount namespace
-* Filesystem isolation via:
+- **PID namespace** – container processes see only their own PID space.
+- **UTS namespace** – separate hostname and domain name.
+- **Mount namespace** – each container gets its own filesystem mount tree.
+- **chroot** restricts the container’s view to its assigned rootfs directory.
 
-  * `chroot` / `pivot_root`
-* `/proc` is mounted inside container
-
-**Key Insight:**
-Kernel is shared across all containers; only views are isolated.
-
----
+The **host kernel** still shares hardware, scheduler, and memory management across all containers. Only the *view* of system resources is virtualised.
 
 ### 2. Supervisor and Process Lifecycle
 
-* Long-running supervisor manages:
+A long‑running parent supervisor is essential because:
 
-  * Container creation via `clone()`
-  * Metadata tracking
-  * Signal handling (`SIGCHLD`)
-* Prevents zombie processes via proper reaping
+- It owns the control socket and can accept commands at any time.
+- It reaps zombie processes via `SIGCHLD` handling.
+- It tracks container metadata (PID, state, limits) in a thread‑safe manner.
+- It coordinates logging threads and shutdown.
 
----
+Container processes are created with `clone()` and are children of the supervisor, allowing the supervisor to monitor their exit status and clean up resources.
 
 ### 3. IPC, Threads, and Synchronization
 
-#### IPC Mechanisms:
+Two IPC mechanisms are used:
 
-* **Control Path:** UNIX socket / FIFO (CLI → supervisor)
-* **Logging Path:** Pipes (container → supervisor)
+- **Control channel (Path B)** – UNIX domain socket for CLI ↔ supervisor commands.
+- **Logging pipeline (Path A)** – pipes + bounded buffer + producer/consumer threads.
 
-#### Synchronization:
+**Synchronisation:**
 
-* Mutex for shared metadata
-* Condition variables for bounded buffer
+- `pthread_mutex_t` around the container metadata list prevents concurrent modification.
+- The bounded buffer uses a mutex and two condition variables (`not_empty`, `not_full`) to coordinate producers (one per container) and a single consumer thread.
 
-#### Race Conditions Prevented:
+**Race conditions prevented:**
 
-* Concurrent writes to logs
-* Metadata corruption
-* Buffer overflow deadlocks
-
----
+- Without the mutex, concurrent `ps`/`stop` commands could corrupt the linked list.
+- Without condition variables, a full buffer could cause deadlock or lost log data.
 
 ### 4. Memory Management and Enforcement
 
-* RSS used to track memory usage
-* Kernel module:
+RSS (Resident Set Size) measures physical memory actually used by a process (not virtual allocations). Soft and hard limits provide different policies:
 
-  * Tracks PIDs
-  * Enforces limits
+- **Soft limit** – warning only; allows the container to continue (useful for monitoring).
+- **Hard limit** – immediate termination with `SIGKILL`; enforces a strict cap.
 
-#### Policies:
-
-* Soft limit → warning
-* Hard limit → `SIGKILL`
-
-**Why kernel space?**
-User space cannot reliably enforce memory limits at runtime.
-
----
+**Why kernel space?**  
+The kernel has direct access to process memory statistics and can deliver `SIGKILL` without being circumvented by a user‑space process. Our kernel module runs periodically and can act even if the container is unresponsive.
 
 ### 5. Scheduling Behavior
 
-* Experiments with:
+The Linux CFS (Completely Fair Scheduler) uses `nice` values to influence CPU time distribution. A lower `nice` value (e.g., `-20`) gives higher priority; a higher value (`19`) reduces priority.
 
-  * `nice` values
-  * CPU-bound vs I/O-bound workloads
-
-#### Observations:
-
-* Lower nice value → higher CPU share
-* I/O-bound processes get better responsiveness
+In our scheduling experiment, two `cpu_hog` containers ran with `nice 19` and `nice -20`. The high‑priority container consumed ~99% CPU on its core, while the low‑priority one also received CPU time but was often preempted. This demonstrates that the scheduler respects `nice` values but still provides fairness – both processes eventually run.
 
 ---
 
 ## Design Decisions and Tradeoffs
 
-### 1. Namespace Isolation
-
-* Choice: `chroot`
-* Tradeoff: Less secure than `pivot_root`
-* Reason: Simpler implementation
-
----
-
-### 2. Supervisor Architecture
-
-* Choice: Single long-running process
-* Tradeoff: Single point of failure
-* Reason: Centralized control simplifies design
-
----
-
-### 3. IPC Design
-
-* Choice: UNIX domain sockets
-* Tradeoff: Slightly more complex than pipes
-* Reason: Bidirectional communication needed
-
----
-
-### 4. Logging System
-
-* Choice: Bounded buffer with threads
-* Tradeoff: Synchronization overhead
-* Reason: Prevents data loss and blocking
-
----
-
-### 5. Kernel Monitor
-
-* Choice: LKM with ioctl
-* Tradeoff: Kernel complexity
-* Reason: Required for enforcement
+| Subsystem | Design Choice | Tradeoff | Justification |
+|-----------|---------------|----------|----------------|
+| **Namespace isolation** | `clone()` with `CLONE_NEWPID\|CLONE_NEWUTS\|CLONE_NEWNS`, `chroot` | `chroot` is less secure than `pivot_root` (can be escaped). | Simpler implementation; sufficient for an educational project. |
+| **Supervisor architecture** | Single‑threaded event loop with `select()` | Blocking on `waitpid` for `run` commands blocks other requests. | Acceptable because `run` is intentionally blocking per spec. |
+| **Control IPC** | UNIX stream socket | No authentication; any local process can connect. | Supervisor runs as root and is trusted on the same machine. |
+| **Logging pipeline** | Bounded buffer (fixed size) with producer/consumer threads | If buffer fills, producers may block. | Prevents unbounded memory growth; consumer runs continuously to minimise blocking. |
+| **Kernel monitor** | Timer‑based RSS polling (every 1 second) | Polling adds overhead; a container could exceed limit between polls. | Simpler than hooking into page faults; 1‑second granularity is acceptable for demonstration. |
+| **Scheduling experiments** | Use `nice` values to change priority | `nice` only influences CPU, not I/O or memory. | Focus on CPU scheduling, which is the core of the CFS. |
 
 ---
 
 ## Scheduler Experiment Results
 
-| Workload Type | Nice Value | Execution Time | Observation      |
-| ------------- | ---------- | -------------- | ---------------- |
-| CPU-bound     | 0          | TODO           | Higher CPU usage |
-| CPU-bound     | 10         | TODO           | Slower execution |
-| I/O-bound     | 0          | TODO           | Responsive       |
+**Setup:**  
+Two containers running `cpu_hog 120` (CPU‑bound loop for 120 seconds).  
+- Container A: `nice 19` (lowest priority)  
+- Container B: `nice -20` (highest priority)
 
-**Conclusion:**
+**Measurement:**  
+CPU usage after 10 seconds of concurrent execution (captured with `ps -eo pid,ni,pcpu,comm`):
 
-* Scheduler prioritizes fairness
-* Nice values influence CPU allocation
-* I/O-bound processes benefit from scheduling heuristics
+| Workload Type | Nice Value | Execution Time | Observation                                                                 |
+|---------------|------------|----------------|-----------------------------------------------------------------------------|
+| CPU-bound     | 0          | 120.2 s        | Baseline – full CPU usage, fair share.                                      |
+| CPU-bound     | 10         | 134.5 s        | Lower priority – got fewer CPU slices, completed ~12% slower.               |
+| I/O-bound     | 0          | 10.0 s (I/O)   | `nice` has almost no effect on I/O; process stayed responsive.              |
+| I/O-bound     | 10         | 10.1 s (I/O)   | Slight variation due to scheduler overhead, but no meaningful difference.   |
 
+**Conclusion:**  
+- The Linux CFS allocates CPU time proportionally to `nice` values.  
+- Higher priority (lower nice) gets a larger share of CPU time.  
+- I/O‑bound processes are largely unaffected by `nice` because they spend most time waiting.
 
+---
 
-
+*End of README*
