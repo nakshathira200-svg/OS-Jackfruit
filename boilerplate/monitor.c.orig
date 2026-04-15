@@ -78,39 +78,6 @@ static void kill_process(const char *id, pid_t pid,
            id, pid, rss, limit);
 }
 
-static void timer_callback(struct timer_list *t)
-{
-    struct monitored_entry *entry, *tmp;
-    long rss;
-
-    mutex_lock(&list_lock);
-    list_for_each_entry_safe(entry, tmp, &monitored_list, list) {
-        rss = get_rss_bytes(entry->pid);
-
-        if (rss < 0) {
-            list_del(&entry->list);
-            kfree(entry);
-            continue;
-        }
-
-        if ((unsigned long)rss >= entry->hard_limit_bytes) {
-            kill_process(entry->container_id, entry->pid,
-                         entry->hard_limit_bytes, rss);
-            list_del(&entry->list);
-            kfree(entry);
-            continue;
-        }
-
-        if ((unsigned long)rss >= entry->soft_limit_bytes && !entry->soft_warned) {
-            log_soft_limit_event(entry->container_id, entry->pid,
-                                 entry->soft_limit_bytes, rss);
-            entry->soft_warned = 1;
-        }
-    }
-    mutex_unlock(&list_lock);
-
-    mod_timer(&monitor_timer, jiffies + CHECK_INTERVAL_SEC * HZ);
-}
 
 static long monitor_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
 {
