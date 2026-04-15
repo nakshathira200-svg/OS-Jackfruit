@@ -318,21 +318,6 @@ User space cannot reliably enforce memory limits at runtime.
 * Nice values influence CPU allocation
 * I/O-bound processes benefit from scheduling heuristics
 
----
 
-## Notes
-
-* Ensure unique rootfs per container
-* Supervisor must handle all signals correctly
-* Logging system must not lose data
-
----
-
-```
-
----
-
-### Source Reference
-This README structure is derived from your provided project specification :contentReference[oaicite:0]{index=0}
 
 
