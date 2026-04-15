@@ -39,3 +39,5 @@ clean:
 	rm -f /tmp/mini_runtime.sock
 
 .PHONY: all ci module clean
+
+ci: engine cpu_hog memory_hog io_pulse
