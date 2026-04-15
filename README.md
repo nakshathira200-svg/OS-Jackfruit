@@ -1,6 +1,4 @@
-Your `README.md` is mostly complete, but a few details are missing or could be improved to match the project guide exactly. Below is a **revised version** that adds missing pieces and clarifies steps. Fill in your actual screenshot links (the ones you already have) and adjust any paths if needed.
 
-```markdown
 # Multi-Container Runtime
 
 ## Team Information
@@ -214,3 +212,4 @@ CPU usage after 10 seconds of concurrent execution (captured with `ps -eo pid,ni
 ---
 
 *End of README*
+```
